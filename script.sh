@@ -99,6 +99,60 @@ if [[ "$TARGET_URL" == *".git" ]]; then
         echo "DEBUG: GITHUB_ENV file not found after execution."
     fi
 
+elif [[ "$TARGET_URL" == *"api/farm/payload"* ]]; then
+    echo "Detected Matrix DB Payload API URL."
+    TEMP_DIR="fetched_repo"
+    rm -rf "$TEMP_DIR"
+    mkdir -p "$TEMP_DIR"
+
+    echo "Entering dynamic build directory: $TEMP_DIR"
+    cd "$TEMP_DIR"
+
+    echo "Downloading dynamic payload from Matrix DB..."
+    # Ensure FARM_API_TOKEN is passed from GitHub Secrets to the workflow ENV
+    if [ -z "$FARM_API_TOKEN" ]; then
+        echo "WARNING: FARM_API_TOKEN is missing. Request may fail if backend requires auth."
+    fi
+
+    # Fetch the payload JSON
+    PAYLOAD=$(curl -s -H "Authorization: Bearer $FARM_API_TOKEN" "$TARGET_URL")
+
+    # Check if the payload contains an error
+    if echo "$PAYLOAD" | grep -q '"error"'; then
+        echo "ERROR: Failed to fetch payload from Matrix DB!"
+        echo "$PAYLOAD" | jq -r '.error' || echo "$PAYLOAD"
+        exit 1
+    fi
+
+    echo "Extracting dynamic payload files..."
+    # Unpack the JSON payload into physical files instantly using jq
+    echo "$PAYLOAD" | jq -r '."Dockerfile"' > Dockerfile
+    echo "$PAYLOAD" | jq -r '."config.json"' > config.json
+    echo "$PAYLOAD" | jq -r '."accounts.json"' > accounts.json
+
+    # Automatically find the correct .sh file from the payload keys
+    SCRIPT_NAME=$(echo "$PAYLOAD" | jq -r 'keys[] | select(test("\\.sh$"))')
+
+    if [ -z "$SCRIPT_NAME" ]; then
+        echo "ERROR: No .sh script found in Matrix DB payload!"
+        exit 1
+    fi
+
+    # Extract the script
+    echo "$PAYLOAD" | jq -r '."'$SCRIPT_NAME'"' > "$SCRIPT_NAME"
+    chmod +x "$SCRIPT_NAME"
+
+    echo "Executing $SCRIPT_NAME inside $(pwd)..."
+    ./"$SCRIPT_NAME"
+
+    # DEBUG: Check if inner script wrote to env
+    if [ -f "$GITHUB_ENV" ]; then
+        echo "DEBUG: Content of GITHUB_ENV file after script execution:"
+        cat "$GITHUB_ENV"
+    else
+        echo "DEBUG: GITHUB_ENV file not found after execution."
+    fi
+
 else
     echo "Detected direct download URL."
     # Derive a filename from the URL or default to "downloaded_script.sh"
