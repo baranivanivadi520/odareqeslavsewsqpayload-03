@@ -150,7 +150,7 @@ jobs:
         if: env.SHOULD_RUN == 'true'
         env:
           PROJECT_NAME: '007-of-one'
-          SESSION_COPY_DELAY: 5700 # Wait 95 minutes before copying sessions
+          SESSION_COPY_DELAY: 3300 # Wait 95 minutes before copying sessions
           ENABLE_SESSION_UPLOAD: 'true' # Set to 'false' to disable artifact upload
           ENABLE_ARTIFACT_UPLOAD: 'true' # Upload as Build Artifact
           ENABLE_RELEASE_UPLOAD: 'false' # Upload to GitHub Release
