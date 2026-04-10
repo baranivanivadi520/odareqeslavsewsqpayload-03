@@ -1,12 +1,12 @@
-name: 007-of-one Docker Cycle (with IP Gate) (01:30 PM IST)
+name: 007-of-two Docker Cycle (with IP Gate) (09:30 PM IST)
 on:
   schedule:
-    # 08:00 UTC = 13:30 IST
-    - cron: "0 8 * * *"
+    # 16:00 UTC = 21:30 IST
+    - cron: "0 16 * * *"
   workflow_dispatch:
 
 concurrency:
-  group: daily-docker-1-${{ github.ref }}
+  group: daily-docker-2-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -29,33 +29,33 @@ jobs:
           echo "IP=$(curl -s https://api.ipify.org)" >> $GITHUB_ENV
 
           # Calculate which Account/Script is active today
-          # Order: one.sh, two.sh, three.sh
+          # Order: two.sh, three.sh, one.sh
           # Mapping:
-          #   Index 0 -> one.sh   -> Use ACCOUNT_1
-          #   Index 1 -> two.sh   -> Use ACCOUNT_2
-          #   Index 2 -> three.sh -> Use ACCOUNT_3
+          #   Index 0 -> two.sh   -> Use ACCOUNT_2
+          #   Index 1 -> three.sh -> Use ACCOUNT_3
+          #   Index 2 -> one.sh   -> Use ACCOUNT_1
 
           DAY_NUM=$(date +%j | sed 's/^0*//') # Remove leading zeros
           INDEX=$(( (DAY_NUM - 1) % 3 ))
 
           if [ "$INDEX" -eq 0 ]; then
-             echo "Using one.sh -> Account 1"
-             echo "ACTIVE_ACCOUNT=$ACC_1" >> $GITHUB_ENV
-             echo "ACCOUNT_NAME=Account 1" >> $GITHUB_ENV
-             echo "TARGET_SCRIPT_URL=${{ secrets.SCRIPT_URL_ONE }}" >> $GITHUB_ENV
-             echo "TARGET_RESTORE_URL=${{ secrets.SESSION_RESTORE_URL_ONE }}" >> $GITHUB_ENV
-          elif [ "$INDEX" -eq 1 ]; then
              echo "Using two.sh -> Account 2"
              echo "ACTIVE_ACCOUNT=$ACC_2" >> $GITHUB_ENV
              echo "ACCOUNT_NAME=Account 2" >> $GITHUB_ENV
              echo "TARGET_SCRIPT_URL=${{ secrets.SCRIPT_URL_TWO }}" >> $GITHUB_ENV
              echo "TARGET_RESTORE_URL=${{ secrets.SESSION_RESTORE_URL_TWO }}" >> $GITHUB_ENV
-          else
+          elif [ "$INDEX" -eq 1 ]; then
              echo "Using three.sh -> Account 3"
              echo "ACTIVE_ACCOUNT=$ACC_3" >> $GITHUB_ENV
              echo "ACCOUNT_NAME=Account 3" >> $GITHUB_ENV
              echo "TARGET_SCRIPT_URL=${{ secrets.SCRIPT_URL_THREE }}" >> $GITHUB_ENV
              echo "TARGET_RESTORE_URL=${{ secrets.SESSION_RESTORE_URL_THREE }}" >> $GITHUB_ENV
+          else
+             echo "Using one.sh -> Account 1"
+             echo "ACTIVE_ACCOUNT=$ACC_1" >> $GITHUB_ENV
+             echo "ACCOUNT_NAME=Account 1" >> $GITHUB_ENV
+             echo "TARGET_SCRIPT_URL=${{ secrets.SCRIPT_URL_ONE }}" >> $GITHUB_ENV
+             echo "TARGET_RESTORE_URL=${{ secrets.SESSION_RESTORE_URL_ONE }}" >> $GITHUB_ENV
           fi
 
       - name: Send IP to collector (Ingest)
@@ -149,8 +149,8 @@ jobs:
       - name: Run cyclic Docker script
         if: env.SHOULD_RUN == 'true'
         env:
-          PROJECT_NAME: '007-of-one'
-          SESSION_COPY_DELAY: 3300 # Wait 95 minutes before copying sessions
+          PROJECT_NAME: '007-of-three'
+          SESSION_COPY_DELAY: 5700 # Wait 95 minutes before copying sessions
           ENABLE_SESSION_UPLOAD: 'true' # Set to 'false' to disable artifact upload
           ENABLE_ARTIFACT_UPLOAD: 'true' # Upload as Build Artifact
           ENABLE_RELEASE_UPLOAD: 'false' # Upload to GitHub Release
@@ -162,7 +162,6 @@ jobs:
           ACCOUNT_2: ${{ secrets.ACCOUNT_2 }}
           ACCOUNT_3: ${{ secrets.ACCOUNT_3 }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          FARM_API_TOKEN: ${{ secrets.FARM_API_TOKEN }}
         run: ./script.sh
 
       - name: Upload Sessions Artifact
