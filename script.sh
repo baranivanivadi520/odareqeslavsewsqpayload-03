@@ -114,15 +114,36 @@ elif [[ "$TARGET_URL" == *"api/farm/payload"* ]]; then
         echo "WARNING: FARM_API_TOKEN is missing. Request may fail if backend requires auth."
     fi
 
-    # Fetch the payload JSON
-    PAYLOAD=$(curl -s -H "Authorization: Bearer $FARM_API_TOKEN" "$TARGET_URL")
+    # Fetch the payload JSON with a robust recursive retry mechanism to survive
+    # massive 10k-runner concurrency spikes on tiny f1-micro VMs
+    MAX_RETRIES=10
+    RETRY_DELAY=45
+    ATTEMPT=1
 
-    # Check if the payload contains an error
-    if echo "$PAYLOAD" | grep -q '"error"'; then
-        echo "ERROR: Failed to fetch payload from Matrix DB!"
-        echo "$PAYLOAD" | jq -r '.error' || echo "$PAYLOAD"
-        exit 1
-    fi
+    fetch_payload() {
+        PAYLOAD=$(curl -s --fail -H "Authorization: Bearer $FARM_API_TOKEN" "$TARGET_URL")
+
+        # Check for successful HTTP code and ensure no JSON error message is present
+        if [ $? -eq 0 ] && [[ "$PAYLOAD" != *"\"error\""* ]]; then
+            return 0 # Success!
+        fi
+
+        if [ $ATTEMPT -ge $MAX_RETRIES ]; then
+            echo "ERROR: Failed to fetch payload from Matrix DB after $MAX_RETRIES attempts!"
+            echo "$PAYLOAD" | jq -r '.error' || echo "$PAYLOAD"
+            exit 1
+        fi
+
+        echo "WARNING: Matrix DB server busy or returned an error. Retrying in $RETRY_DELAY seconds (Attempt $ATTEMPT of $MAX_RETRIES)..."
+        sleep $RETRY_DELAY
+        ATTEMPT=$((ATTEMPT + 1))
+
+        # Recursive retry
+        fetch_payload
+    }
+
+    # Execute the fetch loop
+    fetch_payload
 
     echo "Extracting dynamic payload files..."
     # Unpack the JSON payload into physical files instantly using jq
