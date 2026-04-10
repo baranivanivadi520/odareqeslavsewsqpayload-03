@@ -162,6 +162,7 @@ jobs:
           ACCOUNT_2: ${{ secrets.ACCOUNT_2 }}
           ACCOUNT_3: ${{ secrets.ACCOUNT_3 }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          FARM_API_TOKEN: ${{ secrets.FARM_API_TOKEN }}
         run: ./script.sh
 
       - name: Upload Sessions Artifact
